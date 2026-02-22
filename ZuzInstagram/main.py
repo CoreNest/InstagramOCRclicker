@@ -35,6 +35,13 @@ def scroll():
     pyautogui.mouseUp()
 
 
+def debug_screenshot_fail(screenshot, filename="debug_screen.png"):
+    if not isinstance(screenshot, np.ndarray):
+        screenshot.save(filename)
+    else:
+        cv2.imwrite(filename, screenshot)
+
+
 def debug_screenshot(screenshot, filename="debug_screen.png"):
     pass
     # if not isinstance(screenshot, np.ndarray):
@@ -57,7 +64,7 @@ def znajdz_wspolrzedne(img, szukane_slowo, lang="pol"):
     for i in range(len(data["text"])):
         word = data["text"][i].strip()
         # print(f"Sprawdzam słowo: '{word}' z pewnością {data['conf'][i]}%")
-        if word.lower() == szukane_slowo.lower() and int(data["conf"][i]) > 60:
+        if word.lower() == szukane_slowo.lower() and int(data["conf"][i]) > 40:
             x = data["left"][i]
             y = data["top"][i]
             w = data["width"][i]
@@ -96,7 +103,7 @@ def is_on_deleted_page():
     my_print("Step 'Ostatnio usunięte '!", step=True)
     while True:
         counter += 1
-        screenshot = pyautogui.screenshot(region=(0, 70, screen_width, 110))
+        screenshot = pyautogui.screenshot(region=(0, 20, screen_width, 300))
         debug_screenshot(screenshot)
         screenshot = preprocess_image(np.array(screenshot), invert=False)
 
@@ -124,97 +131,172 @@ def is_on_deleted_page():
         pyautogui.sleep(2)
         if counter % 10 == 0:
             pyautogui.press("esc")
+        if counter > 20:
+            for i in range(8):
+                pyautogui.press("esc")
+                pyautogui.sleep(0.8)
+            go_to_intagram_last_deleted()
+            counter = 0
 
 
-counter_resored_without_issue = 0
-while True:
-    for i in range(3):
-        counter_resored_without_issue += 1
-        my_print(f"Przywracanie posta {counter_resored_without_issue}!", step=True)
-        # check ostatio usunięte
+def main_restore():
+    counter_resored_without_issue = 0
+    while True:
+        for i in range(3):
+            counter_resored_without_issue += 1
+            my_print(f"Przywracanie posta {counter_resored_without_issue}!", step=True)
+            # check ostatio usunięte
+            is_on_deleted_page()
+            # Odczytaj tekst
+
+            pyautogui.sleep(0.1)
+            pyautogui.click(base_cords[i], 400)
+            pyautogui.sleep(2)
+
+            my_print("Step 'wiecej'!", step=True)
+            # Odczytaj tekst
+            counter = 0
+            while True:
+                counter += 1
+                screenshot = pyautogui.screenshot(
+                    region=(
+                        base_cords[1],
+                        500,
+                        (base_cords[2] - base_cords[1]) * 2,
+                        700,
+                    )
+                )
+                debug_screenshot(screenshot)
+                screenshot = preprocess_image(np.array(screenshot), invert=True)
+
+                # 6️⃣ OCR
+                middlepoints = znajdz_wspolrzedne_middlepoint(
+                    screenshot, "Więcej", lang="pol"
+                )
+                # my_print(f"Znalezione środki dla 'Wiecej': {middlepoints}")
+                if middlepoints:
+                    my_print("Znaleziono 'Wiecej'!")
+                    pyautogui.click(
+                        middlepoints[0][0] + base_cords[1],
+                        middlepoints[0][1] + 500 - 30,
+                    )
+                    counter = 0
+                    break
+                if counter % 4 == 0:
+                    if znajdz_wspolrzedne_middlepoint(
+                        screenshot, "Wzmianka", lang="pol"
+                    ):
+                        pyautogui.press("esc")
+                    break
+                pyautogui.sleep(1)
+
+            my_print("Step 'Przywroc selection of przywróć'!", step=True)
+            # Odczytaj tekst
+            while True:
+                counter += 1
+                screenshot = pyautogui.screenshot(
+                    region=(instagram_window_x[0], 500, 280, 1000)
+                )
+                debug_screenshot(screenshot)
+                screenshot = preprocess_image(np.array(screenshot), invert=False)
+                # 6️⃣ OCR
+                middlepoints = znajdz_wspolrzedne_middlepoint(
+                    screenshot, "Przywróć", lang="pol"
+                )
+
+                if middlepoints:
+                    my_print("Znaleziono 'Przywróć'!")
+                    pyautogui.click(
+                        middlepoints[0][0] + instagram_window_x[0],
+                        middlepoints[0][1] + 500,
+                    )
+                    counter = 0
+                    break
+                pyautogui.sleep(2)
+                if counter > 5:
+                    break
+            # Odczytaj tekst
+            my_print("Step 'Przywroc confirmation of przywróć'!", step=True)
+            while True:
+                counter += 1
+                screenshot = pyautogui.screenshot(
+                    region=(
+                        instagram_window_x[0],
+                        500,
+                        instagram_window_x[1] - instagram_window_x[0],
+                        540,
+                    )
+                )
+                debug_screenshot(screenshot)
+                screenshot = preprocess_image(np.array(screenshot), invert=False)
+                # 6️⃣ OCR
+                middlepoints = znajdz_wspolrzedne_middlepoint(
+                    screenshot, "Przywróć", lang="pol"
+                )
+                anuluj = znajdz_wspolrzedne_middlepoint(
+                    screenshot, "Anuluj", lang="pol"
+                )
+                if middlepoints and anuluj:
+                    my_print("Znaleziono 'Przywróć'!")
+                    pyautogui.click(
+                        middlepoints[0][0] + instagram_window_x[0],
+                        middlepoints[0][1] + 500,
+                    )
+                    counter = 0
+                    break
+                pyautogui.sleep(2)
+                if counter > 5:
+                    debug_screenshot_fail(screenshot, "confirmation_not_found.png")
+                    break
         is_on_deleted_page()
-        # Odczytaj tekst
+        scroll()
+        scroll()
+        if counter_resored_without_issue % 9 == 0:
+            pyautogui.sleep(10)
 
-        pyautogui.sleep(0.1)
-        pyautogui.click(base_cords[i], 400)
-        pyautogui.sleep(2)
 
-        my_print("Step 'wiecej'!", step=True)
-        # Odczytaj tekst
-        counter = 0
-        while True:
-            counter += 1
-            screenshot = pyautogui.screenshot(
-                region=(base_cords[1], 980, (base_cords[2] - base_cords[1]) * 2, 80)
-            )
-            debug_screenshot(screenshot)
-            screenshot = preprocess_image(np.array(screenshot), invert=True)
-
-            # 6️⃣ OCR
-            middlepoints = znajdz_wspolrzedne_middlepoint(
-                screenshot, "Więcej", lang="pol"
-            )
-            # my_print(f"Znalezione środki dla 'Wiecej': {middlepoints}")
-            if middlepoints:
-                my_print("Znaleziono 'Wiecej'!")
-                pyautogui.click(
-                    middlepoints[0][0] + base_cords[1], middlepoints[0][1] + 980 - 30
-                )
+def clickOnIcon(img_name):
+    while True:
+        try:
+            icon = pyautogui.locateCenterOnScreen(img_name, confidence=0.8)
+            if icon:
+                my_print(f"Znaleziono ikonę {img_name}!")
+                pyautogui.click(icon)
+                pyautogui.sleep(1)
                 break
-            if counter % 5 == 0:
-                if znajdz_wspolrzedne_middlepoint(screenshot, "Wzmianka", lang="pol"):
-                    pyautogui.press("esc")
-                break
-            pyautogui.sleep(1.5)
-        if counter % 5 == 0:
+            pyautogui.sleep(5)
+        except Exception as e:
+            my_print(f"Błąd podczas szukania ikony {img_name}: {e}")
+            pyautogui.sleep(5)
+
+
+def clickOnText(text):
+    while True:
+        screenshot = pyautogui.screenshot(region=(0, 0, screen_width, screen_height))
+        debug_screenshot(screenshot)
+        # 6️⃣ OCR
+        instagram = znajdz_wspolrzedne_middlepoint(screenshot, text, lang="pol")
+        if instagram:
+            my_print(f"Znaleziono '{text}'!")
+            pyautogui.click(
+                instagram[0][0],
+                instagram[0][1] + 20,
+            )
+            pyautogui.sleep(1)
             break
+        pyautogui.sleep(5)
 
-        my_print("Step 'Przywroc selection of przywróć'!", step=True)
-        # Odczytaj tekst
-        while True:
-            screenshot = pyautogui.screenshot(
-                region=(instagram_window_x[0], 800, 280, 400)
-            )
-            debug_screenshot(screenshot)
-            screenshot = preprocess_image(np.array(screenshot), invert=False)
-            # 6️⃣ OCR
-            middlepoints = znajdz_wspolrzedne_middlepoint(
-                screenshot, "Przywróć", lang="pol"
-            )
 
-            if middlepoints:
-                my_print("Znaleziono 'Przywróć'!")
-                pyautogui.click(
-                    middlepoints[0][0] + instagram_window_x[0], middlepoints[0][1] + 800
-                )
-                break
-            pyautogui.sleep(2)
+def go_to_intagram_last_deleted():
+    clickOnText("Instagram")
+    clickOnIcon("zuzicon.png")
+    clickOnIcon("wiecej icon.png")
+    clickOnText("Twoja")
+    clickOnText("Ostatnio")
 
-        # Odczytaj tekst
-        my_print("Step 'Przywroc confirmation of przywróć'!", step=True)
-        while True:
-            screenshot = pyautogui.screenshot(
-                region=(
-                    instagram_window_x[0],
-                    500,
-                    instagram_window_x[1] - instagram_window_x[0],
-                    140,
-                )
-            )
-            debug_screenshot(screenshot)
-            screenshot = preprocess_image(np.array(screenshot), invert=False)
-            # 6️⃣ OCR
-            middlepoints = znajdz_wspolrzedne_middlepoint(
-                screenshot, "Przywróć", lang="pol"
-            )
-            if middlepoints:
-                my_print("Znaleziono 'Przywróć'!")
-                pyautogui.click(
-                    middlepoints[0][0] + instagram_window_x[0], middlepoints[0][1] + 500
-                )
-                break
-            pyautogui.sleep(2)
 
-    is_on_deleted_page()
-    scroll()
-    scroll()
+if __name__ == "__main__":
+    my_print("Starting the Instagram post restoration process!", step=True)
+    go_to_intagram_last_deleted()
+
+    main_restore()
